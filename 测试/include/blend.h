@@ -2,7 +2,6 @@
 #define _BLEND_H
 
 
-#include "NewStruct.h"
 #include "typedef.h"
 #define FONT_MAX_SIZE 9
 
@@ -14,14 +13,21 @@
 #define  IMAGE_UYVY	     0	//UYVY图像
 #define  IMAGE_YUV420P	     1  //YUV420P图像
 
+
+
+/*
+叠加内容结构
+*/
 typedef struct _blend_str_mess
 {
-	unsigned char string[50];
-	int iLeft;
-	int iTop;
+	unsigned char string[50];//要叠加的字符串
+	int iLeft;//左坐标
+	int iTop;//上坐标
 }blend_str_mess;
 
-
+/*
+叠加信息结构体，里面包含了需要叠加的内容
+*/
 typedef struct _blend_mess
 {
 	int time; 	//是否叠加时间
@@ -29,41 +35,56 @@ typedef struct _blend_mess
 	int iTTop;
 	blend_str_mess strMess[3];
 	int font ;	//1黑体 2楷体 3宋体 4仿宋体 5隶体
-	int iSize;
+	int iSize;	//字号 1--9
+	int isAddEdge;	//是否描边
+	int backGround; //0无背景 1纯色背景 2点状背景 3 线状背景
 	 
 }blend_mess;
-
+/*
+叠加结构，叠加时候使用的结构，起包括了控制，点阵信息等
+*/
 typedef struct blendInfo{
-	blend_mess m_blend_mess;
-	char m_last_time[25];
-	char * m_blendData;
-	int iBitLen[3];
-
+	blend_mess m_blend_mess; //叠加信息
+	char * m_blendData; //点阵数据指针（外部不用操作，算法中自动使用）
+	char * m_digitData[15];//数字的点阵数据 用于叠加时间
+	int iBitLen[3];//需要叠加的strMess对应的点阵数据的偏移量（外部不用操作）
+	int initFlag; // 是否进行了初始化 0否 1 是（外部不用操作）
 }blendInfo;
 /*
  * 函数名：blend_init_no_vdce
- * 函数功能：初始化静态叠加
- * 参数：index【in】初始化标志。当为0的时候完全初始化，包括内存申请 ！=0的时候只是初始化其中的值 *
+ * 函数功能：
+	初始化静态叠加
+	第一次进入的时候会给叠加结构体进行分配空间
+	之后的进入会根据叠加信息获取点阵数据到叠加结构体中
+ * 参数：myblend_info[in/out] 叠加信息结构体
+   返回值:
+	<=0  失败
+	其他 成功
+	
  */
+int blend_init_no_vdce(blendInfo *myblend_info);
 
-int blend_init_no_vdce(int index);
 /*
  * 函数名：blend_begin_no_vdce
- * 函数功能：开始静态叠加
+ * 函数功能：开始叠加
  * 参数： pInBuf[in/out]yuv数据
  * 		width【in】yuv数据的宽
  * 		height【in】yuv数据的高
- * 		index【in】暂时无用
- * 		iType【in】暂时无用
  *		imageType [in] :0 UYVY 1 yuv420P　参照头文件中的宏定义
+		myblend_info[in]:叠加信息结构体
  */
-int blend_begin_no_vdce(byte * pInBuf, int width, int height,int imageType);
+int blend_begin_no_vdce (byte * pInBuf, int width, int height,int imagetype,blendInfo *myblend_info);
 
-
-void set_BlendResetVal(int val);
-//静态叠加时间开关
-//0关 1开
-int blend_time(int enable);
+/*
+函数名称:blend_time
+函数功能:设置时间叠加使能
+参数:
+	blend[in]:0不起用 1 启用
+	myblend_info [in/out]:叠加结构体
+返回值:
+	0
+*/
+int blend_time(int blend,blendInfo *myblend_info);
 
 /*
  * 函数名： setFondColor
@@ -84,14 +105,14 @@ void setBordColor(int R,int G,int B);
 /*
  * 函数名：setblent
  * 函数功能：设置静态叠加信息
- * 参数：newblendinfo[in]静态叠加信息结构提
+ * 参数：myblend_info [in]叠加信息结构题
  */
-int  setblent(blend_mess blendinfo);
+int setblent(blendInfo *myblend_info);
 /*
  * 函数名：ExitBlend
  * 函数功能：释放静态叠加申请的内存
  */
-void ExitBlend();
 
+void ExitBlend(blendInfo *myblend_info);
 
 #endif

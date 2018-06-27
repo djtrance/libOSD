@@ -1,7 +1,7 @@
 
 TARGET = libosd.a
 
-CROSS = arm-none-linux-gnueabi-
+#CROSS = arm-linux-gnueabihf-
 CC  = $(CROSS)gcc
 AR  = $(CROSS)ar
 

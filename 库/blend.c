@@ -26,33 +26,34 @@ Scolor m_BordColor ={0x00,0x80,0x80};
 //静态叠加初始化结构
 blend_mess m_blend_mess_channelx =
 {
-	.font = 3,
+	.font = 3,//宋体
 	.strMess =
 	{
 	{"", 0, 0},
 	{"", 0, 0},
 	{"", 0, 0},
 	},
-	.time = 1,
-	.iTLeft = 10,
-	.iTTop = 10,
-	.iSize = 3,
+	.time = 1,//启用时间叠加
+	.iTLeft = 10,//时间的左坐标
+	.iTTop = 10,//时间的上坐标
+	.iSize = 3,//字体大小默认为3号
+	.isAddEdge = 0,//不描边
+	.backGround = 2//使用点状底纹
 };
 
 /*
    用于检出时间字符串点阵字库
  */
 char m_timeStr[15]="0123456789-:";
-char * m_digitData[15];
 //位字节点阵字库存储区
 static unsigned char ascFontData[1024*4] = {0};//ASC 字库
 static unsigned char hzkFontData[1024*300] = {0};//汉字库
 //字节字库存储区
 static unsigned char ascFontDataByte[1024*4*8] = {0};//ASC||字库
 static unsigned char hzkFontDataByte[1024*300*8] = {0};
-blendInfo blend_info;//静态叠加信息
 
-//获取当前时间保存伟字符串
+
+//获取当前时间保存为字符串
 int GetTimeString(char * str)
 {
 	time_t timep;
@@ -66,14 +67,21 @@ int GetTimeString(char * str)
 	return 0;
 }
 
-//静态叠加时间开关
-//0关 1开
-int blend_time(int blend)
+/*
+函数名称:blend_time
+函数功能:设置时间叠加使能
+参数:
+	blend[in]:0不起用 1 启用
+	myblend_info [in/out]:叠加结构体
+返回值:
+	0
+*/
+int blend_time(int blend,blendInfo *myblend_info)
 {
 	if(blend == 1)
-		blend_info.m_blend_mess.time = 1;
+		myblend_info->m_blend_mess.time = 1;
 	else
-		blend_info.m_blend_mess.time = 0;
+		myblend_info->m_blend_mess.time = 0;
 	return 0;
 }
 
@@ -85,9 +93,12 @@ void set_BlendResetVal(int val)
 }
 
 /*
- * 函数名“：BitmapByte
+ * 函数名：BitmapByte
  * 函数功能： 将位数据保存为字节数据，把bit的每一位转换成为一个字节
- * 参数： buff [out]转换后的数据 bit【in】需要转换的数据
+ * 参数： 
+	buff [out]转换后的数据 
+	bit  [in] 需要转换的数据
+ * 返回值: null
  */
 static  inline void BitmapByte(byte * buff, char bit)
 {
@@ -108,9 +119,12 @@ static  inline void BitmapByte(byte * buff, char bit)
 /*
 函数功能，从字库中读取数据并转换成字节码
 argument:
-width: The wedth of font
-height:The height of font 
-hzk: The type of font
+	width[in]: The wedth of font
+	height[in]:The height of font 
+	hzk[in]: The type of font
+return:
+	1:success
+     	-1 failed
 */
 int GetFontData(int width,int height,int hzk)
 {
@@ -120,7 +134,7 @@ int GetFontData(int width,int height,int hzk)
 	int i = 0;
 	int asclen = 0;
 	int haklen = 0;
-	int iOffset = 0;
+	//int iOffset = 0;
 	switch(hzk)
 	{
 	case 1://黑体
@@ -163,7 +177,7 @@ int GetFontData(int width,int height,int hzk)
 		fclose(hzkfp);
 	}
 	fclose(ascfp);	
-	iOffset = 0;
+	//iOffset = 0;
 	//bit font to byte font
 	for(i = 0;i < asclen;i++)
 	{
@@ -210,7 +224,15 @@ int GetLattice(byte *data,byte *num,int width,int height, int hzk)
 /*
  * 函数名“：ZoomUp
  * 函数功能：对点阵进行放大
- * 参数：in【in】需要放大的点阵 out[out]放大后的点阵 iWidth[in]点阵的宽 iHeight[out]点阵的高 iSize 字体大小
+ * 参数：
+	in [in]需要放大的点阵 
+	out[out]放大后的点阵 
+	iWidth[in]点阵的宽 
+	iHeight[out]点阵的高 
+	iSize 字体大小
+   返回值:
+	0
+	
  */
 int32 ZoomUp(int8 * in, int8 * out, int32 iWidth, int32 iHeight, int32 iSize)
 {
@@ -253,31 +275,97 @@ int32 ZoomUp(int8 * in, int8 * out, int32 iWidth, int32 iHeight, int32 iSize)
 	}
 	return 0;
 }
+
+/*
+函数名称: AddBlackBoard
+函数功能:给点阵数据添加黑边
+参数:
+	Data[in/out]:点阵数据
+	iWidth[in]:点阵数据的宽
+	iHeight[in]:点阵数据的高
+	isAddEdge[in]:是否添加黑边 0 不添加 1 添加
+返回值:
+	0
+	
+*/
+int32 AddBlackBoard(int8 * Data, int32 iWidth, int32 iHeight,int isAddEdge)
+{
+
+	int32 i,j;
+	int8 tempData[160 * 160] = {0};
+	int8 * temp = tempData;
+	int8 * ptemp1 = Data;
+	//不进行操作直接返回
+	if(isAddEdge == 0)
+		return 0;
+	//拷贝点阵数据，一会进行操作的时候使用
+	memcpy(tempData, Data, iWidth * iHeight);
+	//给每个需要填充的像素的上下左右添加描边
+	for(i = 0; i < iHeight; i ++)
+	{
+		for(j = 0; j < iWidth; j ++)
+		{
+			if(*ptemp1 == 1)
+			{
+				if(j != 0)
+				{
+					*(temp - 1) = 2;
+					//*(temp - 1 - iWidth) = 2;
+				}
+
+				*(temp - iWidth) = 2;
+				//*(temp + 1 - iWidth) = 2;
+				*(temp + 1) = 2;
+				//*(temp + 1 + iWidth) = 2;
+				*(temp + iWidth) = 2;
+				//*(temp -1 + iWidth) = 2;
+			}
+			temp ++;
+			ptemp1 ++;
+		}
+	}
+	//修改点阵数据
+	for(i = 0; i < iWidth * iHeight; i ++)
+	{
+		 if((tempData[i] == 2) && (Data[i] == 0))
+			 Data[i] = 2;
+	}
+	return 0;
+
+}
 /*
  * 函数名：blend_init_no_vdce
- * 函数功能：初始化静态叠加
- * 参数：index【in】初始化标志。当为0的时候完全初始化，包括内存申请 ！=0的时候只是初始化其中的值 *
+ * 函数功能：
+	初始化静态叠加
+	第一次进入的时候会给叠加结构体进行分配空间
+	之后的进入会根据叠加信息获取点阵数据到叠加结构体中
+ * 参数：myblend_info[in/out] 叠加信息结构体
+   返回值:
+	<=0  失败
+	其他 成功
+	
  */
-int blend_init_no_vdce(int index)
+int blend_init_no_vdce(blendInfo *myblend_info)
 {
 	int i, j;
 	int strLen;
 	int iOffset = 0;
-	static int blendInit[4] = {0,0,0,0};
+	//static int blendInit[4] = {0,0,0,0};
 	byte tempData[BYTE_SIZE];
 	strLen = 110;
 	int ret = 0;
-	static time_t timestrLastblend = 0; //last time of blend time str 
-	time_t nowtime = 0;//now time
-	if (blendInit[index] == 0)
+	//static time_t timestrLastblend = 0; //last time of blend time str 
+	//time_t nowtime = 0;//now time
+	if (myblend_info->initFlag == 0)
 	{
-		timestrLastblend = time(NULL);
-		if(0 > GetFontData(ZK_WIDTH,ZK_HEIGHT,blend_info.m_blend_mess.font))
+		
+		//timestrLastblend = time(NULL);
+		if(0 > GetFontData(ZK_WIDTH,ZK_HEIGHT,myblend_info->m_blend_mess.font))
 			return -1;
 			
-		blend_info.m_blend_mess = m_blend_mess_channelx;//初始化叠加信息结构
-		blend_info.m_blendData = (char *) malloc(strLen * BYTE_SIZE * FONT_MAX_SIZE * FONT_MAX_SIZE);//叠加数据申请
-		if (blend_info.m_blendData == NULL)
+		myblend_info->m_blend_mess = m_blend_mess_channelx;//初始化叠加信息结构
+		myblend_info->m_blendData = (char *) malloc(strLen * BYTE_SIZE * FONT_MAX_SIZE * FONT_MAX_SIZE);//叠加数据申请
+		if (myblend_info->m_blendData == NULL)
 		{
 			printf("memory failed blend 1 \n");
 			return -1;
@@ -285,53 +373,56 @@ int blend_init_no_vdce(int index)
 
 		for(i = 0; i < strlen(m_timeStr); i ++)//初始化点阵存储空间
 		{
-			m_digitData[i] = malloc(BYTE_SIZE/2  * FONT_MAX_SIZE * FONT_MAX_SIZE);
-			if (m_digitData[i] == NULL)
+			myblend_info->m_digitData[i] = malloc(BYTE_SIZE/2  * FONT_MAX_SIZE * FONT_MAX_SIZE);
+			if (myblend_info->m_digitData[i] == NULL)
 			{
 				printf("memory failed blend 2 \n");
 				return -1;
 			}
 		}
-		blendInit[index] = 1;
+		myblend_info->initFlag = 1;
 	}
-	memset(blend_info.m_blendData, 0, strLen * BYTE_SIZE * FONT_MAX_SIZE * FONT_MAX_SIZE);
+	memset(myblend_info->m_blendData, 0, strLen * BYTE_SIZE * FONT_MAX_SIZE * FONT_MAX_SIZE);
 	//对时间数字点阵进行初始化
-	nowtime = time(NULL);
+	//nowtime = time(NULL);
 	//once  per second
-	if(nowtime != timestrLastblend)
-	{
-		timestrLastblend = nowtime;
+	//if(nowtime != timestrLastblend)
+	//{
+		//timestrLastblend = nowtime;
 		for(i = 0; i < strlen(m_timeStr); i ++)
 		{
-			memset(m_digitData[i], 0, BYTE_SIZE/2 * FONT_MAX_SIZE * FONT_MAX_SIZE);
+			memset(myblend_info->m_digitData[i], 0, BYTE_SIZE/2 * FONT_MAX_SIZE * FONT_MAX_SIZE);
 			memset(tempData, 0, BYTE_SIZE);
 			//获取点阵
-			ret = GetLattice(tempData,(byte*)&(m_timeStr[i]),ZK_WIDTH,ZK_HEIGHT, blend_info.m_blend_mess.font);
+			ret = GetLattice(tempData,(byte*)&(m_timeStr[i]),ZK_WIDTH,ZK_HEIGHT, myblend_info->m_blend_mess.font);
 			//放大
-			ZoomUp((int8 *)tempData, m_digitData[i], ZK_WIDTH/2, ZK_HEIGHT, blend_info.m_blend_mess.iSize); 
+			ZoomUp((int8 *)tempData, myblend_info->m_digitData[i], ZK_WIDTH/2, ZK_HEIGHT, myblend_info->m_blend_mess.iSize); 
+			AddBlackBoard(myblend_info->m_digitData[i],ZK_WIDTH/2 * myblend_info->m_blend_mess.iSize,ZK_HEIGHT*myblend_info->m_blend_mess.iSize,myblend_info->m_blend_mess.isAddEdge);
 		}
-	}
+//	}
 
 	//对文字进行初始化
 	for(j = 0; j < 3; j ++)
 	{
-		blend_info.iBitLen[j] = iOffset;
-		for(i = 0; i < strlen((char *)blend_info.m_blend_mess.strMess[j].string); i++)
+		myblend_info->iBitLen[j] = iOffset;
+		for(i = 0; i < strlen((char *)myblend_info->m_blend_mess.strMess[j].string); i++)
 		{
 			memset(tempData, 0, BYTE_SIZE);
 			//汉字初始化
-			if(blend_info.m_blend_mess.strMess[j].string[i] >= 0xA1)
+			if(myblend_info->m_blend_mess.strMess[j].string[i] >= 0xA1)
 			{
-				ret = GetLattice(tempData,&(blend_info.m_blend_mess.strMess[j].string[i]),ZK_WIDTH,ZK_HEIGHT, blend_info.m_blend_mess.font);
-				ZoomUp((int8 *)tempData, blend_info.m_blendData + iOffset, ZK_WIDTH, ZK_HEIGHT, blend_info.m_blend_mess.iSize);
+				ret = GetLattice(tempData,&(myblend_info->m_blend_mess.strMess[j].string[i]),ZK_WIDTH,ZK_HEIGHT, myblend_info->m_blend_mess.font);
+				ZoomUp((int8 *)tempData, myblend_info->m_blendData + iOffset, ZK_WIDTH, ZK_HEIGHT, myblend_info->m_blend_mess.iSize);
+				AddBlackBoard(myblend_info->m_blendData + iOffset,ZK_WIDTH*myblend_info->m_blend_mess.iSize,ZK_HEIGHT*myblend_info->m_blend_mess.iSize,myblend_info->m_blend_mess.isAddEdge);
 				i ++;
-				iOffset += BYTE_SIZE * blend_info.m_blend_mess.iSize*blend_info.m_blend_mess.iSize;
+				iOffset += BYTE_SIZE * myblend_info->m_blend_mess.iSize*myblend_info->m_blend_mess.iSize;
 			}
 			else
 			{//字母初始化
-				ret = GetLattice(tempData,&(blend_info.m_blend_mess.strMess[j].string[i]),ZK_WIDTH,ZK_HEIGHT, blend_info.m_blend_mess.font);	
-				ZoomUp((int8 *)tempData, blend_info.m_blendData + iOffset, ZK_WIDTH/2, ZK_HEIGHT, blend_info.m_blend_mess.iSize);
-				iOffset += BYTE_SIZE/2 * blend_info.m_blend_mess.iSize*blend_info.m_blend_mess.iSize;
+				ret = GetLattice(tempData,&(myblend_info->m_blend_mess.strMess[j].string[i]),ZK_WIDTH,ZK_HEIGHT, myblend_info->m_blend_mess.font);	
+				ZoomUp((int8 *)tempData, myblend_info->m_blendData + iOffset, ZK_WIDTH/2, ZK_HEIGHT, myblend_info->m_blend_mess.iSize);
+				AddBlackBoard( myblend_info->m_blendData + iOffset,ZK_WIDTH/2 * myblend_info->m_blend_mess.iSize,ZK_HEIGHT*myblend_info->m_blend_mess.iSize,myblend_info->m_blend_mess.isAddEdge);
+				iOffset += BYTE_SIZE/2 * myblend_info->m_blend_mess.iSize*myblend_info->m_blend_mess.iSize;
 			}
 		}
 	}
@@ -340,14 +431,17 @@ int blend_init_no_vdce(int index)
 }
 
 /*
-	设置yuv420P 像素数据
+函数名称 yuv420PixelSet
+函数功能 修改420P的一个像素点的颜色
 参数：
-	yuvData yuv数据
-	color 颜色参数
-	x 像素的x坐标
-	y 像素的y坐标
-	width 图像宽度
-	height: The  image's heigth
+	yuvData[in/out] yuv数据缓冲区
+	color[in] 颜色参数
+	x[in] 	  像素的x坐标
+	y[in] 	  像素的y坐标
+	width[in] 图像宽度
+	height[in]图像的高度
+返回值:
+	null
 
 */
 void yuv420PixelSet(byte *yuvData,Scolor color,int x,int y,int width,int height)
@@ -366,12 +460,13 @@ void yuv420PixelSet(byte *yuvData,Scolor color,int x,int y,int width,int height)
 
 
 /*
-函数名称:
-UYVYSetPixelColor
-根据像素索引修改UYVY这个像素数据的颜色
+函数名称: UYVYSetPixelColor
+函数功能:
+	根据像素索引修改UYVY这个像素数据的颜色
 参数:
-pixelIndex  像素点相对于UYVY数据起点的偏移索引
-yuvAddr	   当前需要被修改的UYVY数据的地址，该地址开始的两个字节分别为该像素的Y 数据 和U/V数据
+	pixelIndex[in]  像素点相对于UYVY数据起点的偏移索引
+	yuvAddr[in/out]	   当前需要被修改的UYVY数据的地址，该地址开始的两个字节分别为该像素的Y 数据 和U/V数据
+	color[in]颜色
 返回值 0
 */
 int UYVYSetPixelColor(int pixelIndex,byte* yuvAddr,Scolor color)
@@ -397,12 +492,12 @@ int UYVYSetPixelColor(int pixelIndex,byte* yuvAddr,Scolor color)
 }
 
 /*
-函数名称:
-YUV422SetGroundPixel
-根据像素索引修改UYVY数据为底色
+函数名称: YUV422SetGroundPixel
+函数功能
+	根据像素索引修改UYVY数据为底色
 参数:
-pixelIndex  像素点相对于UYVY数据起点的偏移索引
-yuvAddr	   当前需要被修改的UYVY数据的地址，该地址开始的两个字节分别为该像素的Y 数据 和U/V数据
+	pixelIndex[in]  像素点相对于UYVY数据起点的偏移索引
+	yuvAddr[in]	   当前需要被修改的UYVY数据的地址，该地址开始的两个字节分别为该像素的Y 数据 和U/V数据
 返回值 0
 */
 int YUV422SetGroundPixel(int pixelIndex,byte* yuvAddr)
@@ -412,12 +507,12 @@ int YUV422SetGroundPixel(int pixelIndex,byte* yuvAddr)
 	return 0;
 }
 /*
-函数名称:
-YUV422SetFontPixel
-根据像素索引修改UYVY数据为字体颜色
+函数名称:YUV422SetFontPixel
+函数功能:
+	根据像素索引修改UYVY数据为字体颜色
 参数:
-pixelIndex  像素点相对于UYVY数据起点的偏移索引
-yuvAddr	   当前需要被修改的UYVY数据的地址，该地址开始的两个字节分别为该像素的Y 数据 和U/V数据
+	pixelIndex  像素点相对于UYVY数据起点的偏移索引
+	yuvAddr	   当前需要被修改的UYVY数据的地址，该地址开始的两个字节分别为该像素的Y 数据 和U/V数据
 返回值 0
 */
 int YUV422SetFontPixel(int pixelIndex,byte* yuvAddr)
@@ -435,13 +530,15 @@ int YUV422SetFontPixel(int pixelIndex,byte* yuvAddr)
  * 			width[in] yuv数据的宽
  * 			height[in]yuv数据的高
  * 			left[in]叠加位置的左边据
- * 			top【in】叠加位置的上边据
- * 			zoom【in】字体大小
- * 			isaddground[in]是否添加背景
+ * 			top[in[叠加位置的上边据
+ * 			zoom[in]字体大小
+ * 			groundType[in]是否添加背景 0无背景 1纯色背景 2点状背景 3 线状背景
 			imagetype[in] 图像类型  0 UYVY 1 yuv420P
+ * 返回值:
+	0
  */
 
-int blend_time_yuv(byte* yuvData, char num , int width, int height, int left, int top, int zoom,int isaddground,int imagetype)
+int blend_time_yuv(byte* yuvData, char num , int width, int height, int left, int top, int zoom,int groundType,int imagetype,blendInfo *myblend_info)
 {
 	int i,j,k,t;
 	int iBase = 0;
@@ -463,7 +560,7 @@ int blend_time_yuv(byte* yuvData, char num , int width, int height, int left, in
 				for(j = 0; j < ZK_WIDTH/2 * zoom; j ++)
 				{
 					//显示字
-					if(*((m_digitData[k]) + i * ZK_WIDTH/2 * zoom + j) ==  1)
+					if(*((myblend_info->m_digitData[k]) + i * ZK_WIDTH/2 * zoom + j) ==  1)
 					{
 						if(imagetype == IMAGE_YUV420P)//420P
 							yuv420PixelSet(yuvData,m_FontColor,left+j,top+i,width,height);
@@ -472,13 +569,34 @@ int blend_time_yuv(byte* yuvData, char num , int width, int height, int left, in
 					}else
 					{
 						//底色
-						if(1==isaddground)
+						if(1==groundType )
+						{
+							if(imagetype == IMAGE_YUV420P)//420P
+								yuv420PixelSet(yuvData,m_BordColor,left+j,top+i,width,height);
+							else if (imagetype == IMAGE_UYVY)//UYVY
+								YUV422SetGroundPixel(iBase + t,yuvData + iBase  + t);
+						}else if(2 == groundType && i%2 == 0 && j%2 == 0)
+						{
+							if(imagetype == IMAGE_YUV420P)//420P
+								yuv420PixelSet(yuvData,m_BordColor,left+j,top+i,width,height);
+							else if (imagetype == IMAGE_UYVY)//UYVY
+								YUV422SetGroundPixel(iBase + t,yuvData + iBase  + t);
+						}else if(3 == groundType  && j%2 == 0)
+						{	
+							if(imagetype == IMAGE_YUV420P)//420P
+								yuv420PixelSet(yuvData,m_BordColor,left+j,top+i,width,height);
+							else if (imagetype == IMAGE_UYVY)//UYVY
+								YUV422SetGroundPixel(iBase + t,yuvData + iBase  + t);	
+						}
+						//判断是否需要描边
+						if(*((myblend_info->m_digitData[k]) + i * ZK_WIDTH/2 * zoom + j) ==  2)
 						{
 							if(imagetype == IMAGE_YUV420P)//420P
 								yuv420PixelSet(yuvData,m_BordColor,left+j,top+i,width,height);
 							else if (imagetype == IMAGE_UYVY)//UYVY
 								YUV422SetGroundPixel(iBase + t,yuvData + iBase  + t);
 						}
+						
 					}
 					t= t+2;//UYVY因为一个像素两个字节 所以一次走两个字节
 				}
@@ -500,14 +618,17 @@ int blend_time_yuv(byte* yuvData, char num , int width, int height, int left, in
  * 		data[in]点阵数据
  * 		pInBuf[in/out]yuv数据
  * 		zoom[in]字体大小
- * 		isaddground[in]是否开启底色
+ * 		groundType[in]是否添加背景 0无背景 1纯色背景 2点状背景 3 线状背景
+		imagetype[in] 图像类型  0 UYVY 1 yuv420P
+		myblend_info [in]叠加结构体
+ * 返回值:
+	0
  */
-int blend_string_yuv(int iNum,int tmpLen,int iLeft,int iTop,int width,int height,char *data,byte * pInBuf, int zoom,int isaddground,int imagetype)
+int blend_string_yuv(int iNum,int tmpLen,int iLeft,int iTop,int width,int height,char *data,byte * pInBuf, int zoom,int groundType,int imagetype,blendInfo *myblend_info)
 {
 	int i,j,k;
 	char *p = data;//点阵字库数据
 	byte *yuvData = pInBuf;//yuv数据
-
 	if(imagetype == IMAGE_UYVY)//UYVY一个像素占用两个紧挨着字节需要*2
 	{
 		iLeft*=2;
@@ -521,7 +642,7 @@ int blend_string_yuv(int iNum,int tmpLen,int iLeft,int iTop,int width,int height
 	for(k = 0; k < tmpLen;)
 	{
 		iBase = (iTop-1) * width + iLeft; //422图像使用
-		if(blend_info.m_blend_mess.strMess[iNum].string[k] >= 0xA1)
+		if(myblend_info->m_blend_mess.strMess[iNum].string[k] >= 0xA1)
 		{//汉字
 			for(i = 0; i < ZK_HEIGHT * zoom; i ++)
 			{
@@ -538,7 +659,27 @@ int blend_string_yuv(int iNum,int tmpLen,int iLeft,int iTop,int width,int height
 					}else
 					{
 						//底色
-						if(1==isaddground)
+						if(1==groundType )
+						{
+								if(imagetype == IMAGE_YUV420P)
+									yuv420PixelSet(yuvData,m_BordColor,iLeft+j+iOffset,iTop+i,width,height);
+								else if (imagetype == IMAGE_UYVY)
+									YUV422SetGroundPixel(iBase + iOffset + t,yuvData + iBase + iOffset*2 + t);
+						}else if(2 == groundType && i%2 == 0 && j%2 == 0)
+						{
+								if(imagetype == IMAGE_YUV420P)
+									yuv420PixelSet(yuvData,m_BordColor,iLeft+j+iOffset,iTop+i,width,height);
+								else if (imagetype == IMAGE_UYVY)
+									YUV422SetGroundPixel(iBase + iOffset + t,yuvData + iBase + iOffset*2 + t);
+						}else if(3 == groundType  && j%2 == 0)
+						{	
+								if(imagetype == IMAGE_YUV420P)
+									yuv420PixelSet(yuvData,m_BordColor,iLeft+j+iOffset,iTop+i,width,height);
+								else if (imagetype == IMAGE_UYVY)
+									YUV422SetGroundPixel(iBase + iOffset + t,yuvData + iBase + iOffset*2 + t);	
+						}
+						//判断是否需要描边
+						if(*(p + i * ZK_WIDTH * zoom + j) ==  2)
 						{
 							if(imagetype == IMAGE_YUV420P)
 								yuv420PixelSet(yuvData,m_BordColor,iLeft+j+iOffset,iTop+i,width,height);
@@ -568,11 +709,30 @@ int blend_string_yuv(int iNum,int tmpLen,int iLeft,int iTop,int width,int height
 							yuv420PixelSet(yuvData,m_FontColor,iLeft+j+iOffset,iTop+i,width,height);
 						else if (imagetype == IMAGE_UYVY)
 							YUV422SetFontPixel(iBase + iOffset + t,yuvData + iBase + iOffset*2 + t);
-
 					}else
 					{
 						//底色
-						if(1==isaddground)
+						if(1==groundType )
+						{
+								if(imagetype == IMAGE_YUV420P)
+									yuv420PixelSet(yuvData,m_BordColor,iLeft+j+iOffset,iTop+i,width,height);
+								else if (imagetype == IMAGE_UYVY)
+									YUV422SetGroundPixel(iBase + iOffset + t,yuvData + iBase + iOffset*2 + t);
+						}else if(2 == groundType && i%2 == 0 && j%2 == 0)
+						{
+								if(imagetype == IMAGE_YUV420P)
+									yuv420PixelSet(yuvData,m_BordColor,iLeft+j+iOffset,iTop+i,width,height);
+								else if (imagetype == IMAGE_UYVY)
+									YUV422SetGroundPixel(iBase + iOffset + t,yuvData + iBase + iOffset*2 + t);
+						}else if(3 == groundType  && j%2 == 0)
+						{	
+								if(imagetype == IMAGE_YUV420P)
+									yuv420PixelSet(yuvData,m_BordColor,iLeft+j+iOffset,iTop+i,width,height);
+								else if (imagetype == IMAGE_UYVY)
+									YUV422SetGroundPixel(iBase + iOffset + t,yuvData + iBase + iOffset*2 + t);
+						}
+						//判断是否需要描边
+						if(*(p + i * ZK_WIDTH/2 * zoom + j) ==  2)
 						{
 							if(imagetype == IMAGE_YUV420P)
 								yuv420PixelSet(yuvData,m_BordColor,iLeft+j+iOffset,iTop+i,width,height);
@@ -595,13 +755,14 @@ int blend_string_yuv(int iNum,int tmpLen,int iLeft,int iTop,int width,int height
 
 /*
  * 函数名：blend_begin_no_vdce
- * 函数功能：开始静态叠加
+ * 函数功能：开始叠加
  * 参数： pInBuf[in/out]yuv数据
  * 		width【in】yuv数据的宽
  * 		height【in】yuv数据的高
  *		imageType [in] :0 UYVY 1 yuv420P　参照头文件中的宏定义
+		myblend_info[in]:叠加信息结构体
  */
-int blend_begin_no_vdce (byte * pInBuf, int width, int height,int imagetype)
+int blend_begin_no_vdce (byte * pInBuf, int width, int height,int imagetype,blendInfo *myblend_info)
 {
 	int i;
 	int iLeft,iTop;
@@ -609,29 +770,28 @@ int blend_begin_no_vdce (byte * pInBuf, int width, int height,int imagetype)
 	char timeStr[100] = {0};
 	if(m_iReset == 1)
 	{//重启静态叠加
-		if(blend_init_no_vdce(0)==-1)
+		if(blend_init_no_vdce(myblend_info)==-1)
 			return -1;
 		m_iReset = 0;
 	}
-	if(blend_info.m_blend_mess.time == 1)
+	if(myblend_info->m_blend_mess.time == 1)
 	{//叠加时间
 		GetTimeString(timeStr);
 		for(i = 0; i < strlen(timeStr); i ++)
 		{
-			blend_time_yuv(pInBuf,timeStr[i], width, height, blend_info.m_blend_mess.iTLeft + i * ZK_WIDTH/2 * blend_info.m_blend_mess.iSize,blend_info.m_blend_mess.iTTop, blend_info.m_blend_mess.iSize,1,imagetype);
+			blend_time_yuv(pInBuf,timeStr[i], width, height, myblend_info->m_blend_mess.iTLeft + i * ZK_WIDTH/2 * myblend_info->m_blend_mess.iSize,myblend_info->m_blend_mess.iTTop, myblend_info->m_blend_mess.iSize,myblend_info->m_blend_mess.backGround,imagetype,myblend_info);
 
 		}
-		strcpy(blend_info.m_last_time, timeStr);
 	}
 	offsetLen = 0;
 	for(i=0;i<3;i++)
 	{//叠加文本
-		tmpLen = strlen((char *)blend_info.m_blend_mess.strMess[i].string);
-		iLeft = blend_info.m_blend_mess.strMess[i].iLeft;
-		iTop = blend_info.m_blend_mess.strMess[i].iTop;
-		offsetLen = blend_info.iBitLen[i];
+		tmpLen = strlen((char *)myblend_info->m_blend_mess.strMess[i].string);
+		iLeft = myblend_info->m_blend_mess.strMess[i].iLeft;
+		iTop = myblend_info->m_blend_mess.strMess[i].iTop;
+		offsetLen = myblend_info->iBitLen[i];
 		if(tmpLen>0)
-			blend_string_yuv(i,tmpLen,iLeft,iTop,width,height,blend_info.m_blendData+offsetLen,pInBuf, blend_info.m_blend_mess.iSize,1,imagetype);
+			blend_string_yuv(i,tmpLen,iLeft,iTop,width,height,myblend_info->m_blendData+offsetLen,pInBuf, myblend_info->m_blend_mess.iSize,myblend_info->m_blend_mess.backGround,imagetype,myblend_info);
 	}
 	return 0;
 }
@@ -677,13 +837,12 @@ void setBordColor(int R,int G,int B)
 /*
  * 函数名：setblent
  * 函数功能：设置静态叠加信息
- * 参数：newblendinfo[in]静态叠加信息结构提
+ * 参数：newblendinfo[in]静态叠加信息
+	myblend_info [in]叠加信息结构题
  */
-int setblent(blend_mess newblendinfo)
+int setblent(blendInfo *myblend_info)
 {
-	memset(&blend_info.m_blend_mess,0,sizeof(blend_info.m_blend_mess));
-	blend_info.m_blend_mess = newblendinfo;//设置静态叠加信息结构
-	if(blend_init_no_vdce(0)==-1)
+	if(blend_init_no_vdce(myblend_info)==-1)
 		return -1;
 	return 0;
 }
@@ -694,21 +853,22 @@ int setblent(blend_mess newblendinfo)
  * 函数功能：释放静态叠加申请的内存
  */
 
-void ExitBlend()
+void ExitBlend(blendInfo *myblend_info)
 {
 	int i = 0;
-	if(blend_info.m_blendData != NULL)
+	if(myblend_info->m_blendData != NULL)
 	{
-		free(blend_info.m_blendData);
-		blend_info.m_blendData = NULL;
+		free(myblend_info->m_blendData);
+		myblend_info->m_blendData = NULL;
 	}
 	for(i = 0; i < strlen(m_timeStr); i ++)//初始化点阵存储空间
 	{
-		if(m_digitData[i] != NULL)
+		if(myblend_info->m_digitData[i] != NULL)
 		{
-			free(m_digitData[i]);
-			m_digitData[i] = NULL;
+			free(myblend_info->m_digitData[i]);
+			myblend_info->m_digitData[i] = NULL;
 		}
 	}
+	myblend_info->initFlag = 0;
 }
 
